@@ -1,0 +1,97 @@
+---
+title: "Client Report - Stock Market"
+subtitle: "Course DS 460"
+author: "Joel Doh"
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-copy: hover
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+execute: 
+  warning: false
+    
+---
+
+```{python}
+import polars as pl
+import pandas as pd
+import yfinance as yf
+import plotly.express as px
+```
+
+
+## Elevator pitch
+
+_Stock markets are great places to invest some capital and hopefully make money. While people can make a great deal money from it, they can also lose them. Losing and making profit can be caused by poor or wise decisions. Data can help make the more appropriate decisions, thus minimize lost. In this project, We are going to examine how the market has been doing the last 5 years in order in order to make some investment decisions._
+
+```{python}
+tickers_use = ["CXW", "F", "GM", "JCP", "KR", "WDC", "NKE","T", "WDAY", "WFC", "WMT"]
+
+dat = yf.download(tickers_use, period="5y", interval="1d").reset_index()
+```
+
+```{python}
+dat = pl.from_pandas(dat).melt(id_vars="('Date', '')")\
+    .with_columns(
+        pl.col("variable")\
+            .str.replace_many(["'", "(",")", " "], "")\
+            .str.split_exact(",", 1).alias("variable"))\
+    .unnest("variable")\
+    .rename({"('Date', '')":"date"})\
+    .pivot(
+        values="value",
+        index=["date", "field_1"],
+        columns="field_0",
+        aggregate_function="first")\
+    .rename({"field_1":"ticker"})
+    
+dat.write_parquet("stock.parquet")
+
+stock_data = pl.read_parquet('stock.parquet')
+
+print(stock_data.head(5))
+```
+
+_Adjusted close is more important because it’s calculation involves dividends and other factors that may determine the real value of a share in the stock market. In the chart below, we can see that the stock WDAY has been doing great from 2019 to 2021 before a great fall in 2022. Since then, it has been going up reaching it’s highest adjusted close price in the beginning of 2024. However, the most constant ticker in terms of adjusted close has been WMT._
+
+_About the same pattern appears for the Close feature were the evolution of each ticker during the last 5 years look a lot like the evolution of adjusted close._
+
+```{python}
+AdjClo_chart =  px.line(stock_data, x='date', y='AdjClose', color='ticker')
+
+print(AdjClo_chart.show())
+```
+
+
+```{python}
+Close_chart =  px.line(stock_data, x='date', y='Close', color='ticker')
+
+print(Close_chart.show())
+```
+
+_Now, in terms of volume of share sold F, T, and WDC had the highest volume of shares sold during the past 5 years. This could due to their low value. WDAY and WMT sold a lot lower amount of shares than others.._
+
+```{python}
+Volume_chart =  px.scatter(stock_data, x='date', y='Volume', color='ticker')
+
+print(Volume_chart.show())
+
+```
+
+
+## Conclusion
+
+_Regarding these facts, I would say the less risky investment would be in WMT because its the most constant ticker on the stock market according to our dataset._
