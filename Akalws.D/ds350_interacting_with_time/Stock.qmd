@@ -1,0 +1,98 @@
+---
+title: "10 STOCKS OVER THE LAST 5 YEARS"
+subtitle: "Big Data Analysis"
+author: "Daniel Akalws"
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-copy: hover
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+execute: 
+  warning: false
+    
+---
+
+```{python}
+#| label: libraries
+#| include: false
+import pandas as pd
+import numpy as np
+import polars as pl
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime
+from lets_plot import *
+import lets_plot as lp
+LetsPlot.setup_html()
+```
+
+
+## Elevator pitch
+
+_In this project, I visualized the stock data for ten companies that my friend suggested as potential investments. I used the `yfinance` module to download the data, and the `lets-plot` and `plotly` modules to create interactive charts. I focused on the close prices and the volumes of the stocks over the last five years._
+
+```{python}
+#| label: project data
+#| code-summary: Read and format project data
+# Include and execute your code here
+pdat = pl.read_parquet("stock.parquet")
+```
+
+
+## QUESTION|TASK 1
+
+__Use `lets-plot` and `plotly`to build interactive visualizations of the stock performances over the last 5 years.__
+
+_This chart shows the stock prices over time using. I used a line plot with date on the x-axis and price on the y-axis. This chart allows me to compare the trends and patterns of the stock prices across different companies. Upon examining the chart, it is evident that WDAY has a strong performance throughout the observed period. With an initial high closing around 200, WDAY surpassed this mark in October 2021, reaching a peak of 299.09. This volatility in the stock suggests both risk and potential reward for investors. In contrast, WMT exhibits a steady growth trajectory in the stock market. The closing prices for WMT suggest reliability, making it a potential favorable option for investors seeking stability. The remaining stocks in the analysis have closing prices ranging from 10 to 50, indicating a relatively less volatile market trend compared to WDAY. I find the line plot as a valuable tool for visualizing and interpreting the performance of various stocks, helping in informed investment decision._
+
+```{python}
+#| label: Q1
+#| code-summary: Read and format data
+# Include and execute your code here
+performance_chart = px.line(pdat, x='date', y='Close', color='ticker',
+                      title='Stock Performances Over the Last 5 Years',
+                      labels={'date': 'Date', 'Close': 'Closing Price'})
+performance_chart.show()
+
+```
+
+
+## QUESTION|TASK 2
+
+__Make a graphic that helps you support a solid question around how an investor would use volume in their trading strategy__
+
+_This chart shows the stock volumes over time. I used a scatter plot with date on the x-axis and volume on the y-axis. This chart allows me to compare the trading activity and how investors might use the volume of stocks in trading. F(ticker) stands out with its great volume from late 2019 which indicates a lot of people in the market. The volume of F(ticker) reaches as high as 311.65 in 2022 then it decreases. Looking at the trend it follows there is a possibility it may shoot up high again in 2026. Due to its high volume, it makes a high volatile, which means investors must be cautious in going for such stock. From the chart we can also see that the T(ticker) also has a volume throughtout the last 5 years. You either gain more or you lose more with such volatile stocks. The rest of the stocks has less volume below 100M which indicates less volatility, hence less risky investment._
+
+
+
+
+
+```{python}
+#| label: Q3
+#| code-summary: Read and format data
+# Include and execute your code here
+volume_chart = px.scatter(pdat, x='date', y='Volume', color='ticker',
+             title='Volume of Stocks Over the Last 5 Years',
+             labels={'date': 'Date', 'Volume': 'Volume'},
+             category_orders={"ticker": ["CXW", "F", "GM", "JCP", "KR", "WDC", "NKE", "T", "WDAY", "WFC", "WMT"]},
+             height=400, width=800)
+
+
+volume_chart.show()
+
+```
+
+
