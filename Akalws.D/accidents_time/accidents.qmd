@@ -1,0 +1,181 @@
+---
+title: "Accidents"
+subtitle: "Big Data Analysis"
+author: "Daniel Akalws"
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-copy: hover
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+execute: 
+  warning: false
+    
+---
+
+```{python}
+#| label: libraries
+#| include: false
+import plotly.graph_objects as go
+from datetime import datetime
+from lets_plot import *
+LetsPlot.setup_html()
+import polars as pl
+import pins
+import pandas as pd
+```
+
+
+## Elevator pitch
+
+_In this project, I visualized the accidents data over a period of time. I created a column that states the time and date the accident happened and  also included charts that indicates the day and hour accidents occur most often._
+
+```{python}
+#| label: project data
+#| code-summary: Read and format project data
+# Include and execute your code here
+dat = pl.read_parquet("ny_crashes.parquet")
+```
+
+
+## QUESTION|TASK 1
+
+__Create a new column that reports the date and base hour the accident happened.__
+
+_I creadted a new column that reports the date and hour of evrey accident that happened. I was able to convert the date and time from string to the appropriate form._
+
+```{python}
+#| label: Q1
+#| code-summary: Read and format data
+# Include and execute your code here
+'''dat = pl.read_csv('dat')\
+     .with_columns(
+         pl.col("CRASH DATE").str.to_date("%m/%d/%Y").alias("date"),
+         pl.col("CRASH TIME").str.to_time("%H:%M").alias("time"),
+         pl.concat_str(["CRASH DATE","CRASH TIME"], separator=" ")\
+             .str.to_datetime("%m/%d/%Y %H:%M").alias("date_time"))
+
+dat.write_parquet("ny_crashes.parquet", compression="zstd", compression_level=15)'''
+
+```
+
+
+## QUESTION|TASK 2
+
+__Use that column to get an accident rate and injury rate per hour data set.__
+
+_I created the a column to get the accident rate and injury rate per hour. This allows me to use the information to figure out the hour that most accidents occur. Most accidents can be avoided when we have this information._
+
+
+
+
+
+```{python}
+#| label: Q3
+#| code-summary: Read and format data
+# Include and execute your code here
+rates_hour=dat\
+    .with_columns(
+        pl.col('date_time').dt.truncate('1h').alias('hour_floor'))\
+        .group_by('hour_floor')\
+        .agg(
+            pl.sum("NUMBER OF PERSONS INJURED").alias('injured_total'),
+            pl.count('BOROUGH').alias('accidents'))\
+        .with_columns(
+        pl.col('hour_floor').dt.hour().alias('hour')
+        )
+rates_hour
+
+rates_day=dat\
+    .with_columns(
+        pl.col('date_time').dt.truncate('1d').alias('day_floor'))\
+        .group_by('day_floor')\
+        .agg(
+            pl.sum("NUMBER OF PERSONS INJURED").alias('injured_total'),
+            pl.count('BOROUGH').alias('accidents'))\
+    .with_columns(
+        pl.col('day_floor').dt.weekday().alias('weekday')
+        )
+rates_day
+
+```
+
+
+## QUESTION|TASK 3
+
+__Use `lets-plot` and `plotly`to build interactive visualizations displaying the rate of injuries over time.__
+
+_This chart shows the rate of accidents per day. We can see from chart that weekends usually have less accidents. This maybe be as a result of less travel on weekends. People usually take some break from work and rest on the weekends hence less accidents occur._
+
+```{python}
+#| label: Q3
+#| code-summary: Read and format data
+# Include and execute your code here
+ggplot(rates_day.sort('weekday'), aes(x = 'weekday', y = 'accidents')) +\
+  geom_boxplot() +\
+  scale_x_discrete()
+
+```
+
+
+
+ ## QUESTION|TASK 4
+
+__Use `lets-plot` and `plotly`to build interactive visualizations displaying the rate of injuries over time.__
+
+_This chart indicates the rate of accidents per hour by using a bar chart. From the chart we clearly see that accidents occur most often in the morning around 8am. This maybe due to a lot of people going to work at that time. Accidents occur less at dawn as indicated by the chart. 5am has the least occurance of accidents._
+
+
+```{python}
+#| label: Q3
+#| code-summary: Read and format data
+# Include and execute your code here
+(ggplot(rates_hour, aes(x='hour', y='accidents')) +
+ geom_histogram(stat='identity', bins=len(rates_hour['hour'].unique()), fill= '#87CEEB') +
+ scale_x_discrete() +
+ ggtitle("Number of accidents per hour") +
+ theme(axis_text_x=element_text(angle=0, vjust=0.5)))
+
+```
+
+
+
+
+
+
+ ## QUESTION|TASK 5
+
+__Highlight an interisting feature in a refined chart and write a short paragraph summarizing your ideas.__
+
+_I analyzed the accident data to understand the distribution of accidents over each hour of the day. The visualization revealed a notable pattern: the highest frequency of accidents occurs at 8 AM, coinciding with the morning rush hour, while the lowest frequency is observed at 5 AM. This finding suggests a correlation between peak traffic hours and accident rates, with morning congestion contributing to increased accident. This aid in the identification of high-risk periods for road safety interventions I felt it was an intresting feature._
+
+
+```{python}
+#| label: Q3
+#| code-summary: Read and format data
+# Include and execute your code here
+ates_hour=dat\
+    .with_columns(
+        pl.col('date_time').dt.truncate('1h').alias('hour_floor'))\
+        .group_by('hour_floor')\
+        .agg(
+            pl.sum("NUMBER OF PERSONS INJURED").alias('injured_total'),
+            pl.count('BOROUGH').alias('accidents'))\
+        .with_columns(
+        pl.col('hour_floor').dt.hour().alias('hour')
+        )
+rates_hour
+
+```
