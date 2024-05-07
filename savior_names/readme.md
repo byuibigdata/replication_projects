@@ -20,3 +20,12 @@ In 1978 Susan Easton Black [penned an article](https://www.lds.org/ensign/1978/0
 - Can we take stored data where the _unit of analysis_ is verse and convert the _unit of analysis_ to words that appear after a `savior name`?
 - Can we build a target variable, the number of words after a savior name?
 - Can we build the following features - book where the name appears, chapter when the name appears, verse where the name appears, the number of times that `a, an, and, are, as, at, be, but, by, for, if, in, into, is, it, no, not, of, on, or, such, that, the, their, then, there, these, they, this, to, was, will, with` appear in the word block.
+
+### Completion Structure
+
+Follow these guidelines:
+
+- Work with your team to get as far as possible in the hour.
+- Use polars (unless it will not work, but it should).
+- Each student submits their compiled report (which can be the teams) in Canvas.
+- Each team submits a pull request by 3:30 pm on Tuesday. Please include a team folder within the savior name folder.
