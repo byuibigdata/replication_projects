@@ -1,0 +1,71 @@
+---
+title: "Replication Activity"
+subtitle: "Course DS 460"
+author: "Kentucky Fried Champions"
+execute:
+  warning: false
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-copy: hover
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+    
+---
+
+
+```{python}
+#| label: libraries
+import polars as pl
+import pyarrow as pa
+from pyarrow import csv
+from pyarrow import dataset as ds
+import pyarrow.parquet as pq
+import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
+import pyreadr as r
+```
+
+
+```{python}
+#| label: data
+#| code-summary: Read and format project data
+#| output: asis
+scrips = pl.from_arrow(
+        csv.read_csv("lds-scriptures.csv"))
+names =  pl.from_arrow(pq.read_table("../BoM_SaviorNames.parquet"))
+
+```
+
+```{python}
+def dist_names(dat, spl):
+    text = list(dat.select(pl.col("scripture_text").str.to_lowercase().str.concat(" "))["scripture_text"])[0].str.split(sep=spl).unlist()
+
+    len = (list(text.str.split(" "))).length()
+
+    return len
+```
+```{python}
+saviors_names = list(names.select(pl.col("name").unique().sort().str.to_lowercase().str.concat('|'))["name"])[0]
+
+bom = scrips.filter(pl.col("volume_title") == "Book of Mormon")
+
+nested_bom = bom.group_by(pl.col("book_short_title")).all()
+
+
+
+
+```
