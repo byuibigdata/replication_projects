@@ -1,0 +1,139 @@
+```{python}
+import polars as pl
+import pyarrow as pa
+from pyarrow import csv
+from pyarrow import dataset as ds
+import pyarrow.parquet as pq
+import re
+import matplotlib.pyplot as plt
+```
+
+```{python}
+scriptures = pl.read_csv('lds-scriptures.csv').filter(pl.col('volume_id') == 3)
+names_pq = pl.read_parquet('BoM_SaviorNames.parquet')
+
+```
+
+```{python}
+names = []
+for name in names_pq['name']:
+    names.append(name)
+
+
+```
+
+```{python}
+scripture_text = ""
+last_book = 67
+last_chapter = 1190
+last_verse = 31103
+for verse in scriptures[['scripture_text', 'book_id', 'chapter_id', 'verse_id']].rows():
+    scripture_text += verse[0]
+    if verse[1] != last_book:
+        scripture_text += '$'
+        last_book = verse[1]
+    if verse[2] != last_chapter:
+        scripture_text += '%'
+        last_chapter = verse[2]
+    if verse[3] != last_verse:
+        scripture_text += '^'
+        last_verse = verse[3]
+
+```
+
+```{python}
+pattern = '|'.join(map(re.escape, names))
+scripture_text_split = re.split(pattern, scripture_text)
+scripture_text_split = pl.DataFrame(scripture_text_split).rename({'column_0': 'text'})
+
+```
+
+```{python}
+book_id_to_name = {}
+for row in scriptures[['book_id', 'book_title']].rows():
+    book_id_to_name[row[0]] = row[1]
+
+chapter_id_to_name = {}
+for row in scriptures[['chapter_id', 'chapter_number']].rows():
+    chapter_id_to_name[row[0]] = row[1]
+
+verse_id_to_name = {}
+for row in scriptures[['verse_id', 'verse_number']].rows():
+    verse_id_to_name[row[0]] = row[1]
+
+```
+
+```{python}
+book = 67
+chapter = 1190
+verse = 31103
+references = []
+num_verse = []
+num = 0
+for row in scripture_text_split['text']:
+    try:
+        references.append(f'{book_id_to_name[book]} {chapter_id_to_name[chapter]}:{verse_id_to_name[verse]}')
+    except:
+        pass
+    num_verse.append(num)
+    num = 0
+    for char in row:
+        if char == '$':
+            book += 1
+        elif char == '%':
+            chapter += 1
+        elif char == '^':
+            verse += 1
+            num += 1
+    
+
+scripture_text_split = scripture_text_split.with_columns(pl.Series("reference", references), pl.Series("number of verses", num_verse))
+```
+
+```{python}
+
+plot_data = pl.DataFrame({
+    'year': range(len(scripture_text_split)), 
+    'value': scripture_text_split['number of verses']
+})
+
+# Convert to pandas DataFrame
+plot_data_pandas = plot_data.to_pandas()
+
+# Ensure data is sorted by 'year' if any manipulation occurred
+plot_data_pandas.sort_values('year', inplace=True)
+
+# Plotting using matplotlib
+plt.figure(figsize=(10, 6))
+plt.plot(plot_data_pandas['year'], plot_data_pandas['value'], '-o')  # Ensuring to connect points with lines
+plt.title("Number of verses between references to the Savior")
+plt.xlabel("Entry Index")
+plt.ylabel("Number of Verses")
+plt.grid(True)
+plt.show()
+
+print("I had not the time to show the references on the chart in any way, and this was the only kind of graph that I managed to get to work at all, but there it is. We can see that most of the points are below 5, with some venturing into the 20s and 30s and one even reaching near 90. The mean number of verses between references to the Savior was 1.62, and the median was 1. ")
+```
+
+```{python}
+# concept 3.4
+words_to_count = [' a ', ' an ', ' and ', ' are ', ' as ', ' at ', ' be ', ' but ', ' by ', 
+                  ' for ', ' if ', ' in ', ' into ', ' is ', ' it ', ' no ', ' not ', ' of ', 
+                  ' on ', ' or ', ' such ', ' that ', ' the ', ' their ', ' then ', ' there ', 
+                  ' these ', ' they ', ' this ', ' to ', ' was ', ' will ', ' with ']
+
+def count_words(text):
+    text = text.lower()
+    return sum(text.count(word) for word in words_to_count)
+
+df = scripture_text_split.with_columns(pl.col("text").apply(count_words).alias("count"))
+```
+
+```{python}
+print(scripture_text_split.select(pl.mean("number of verses")))
+print(scripture_text_split.select(pl.median("number of verses")))
+```
+
+```{python}
+
+```
