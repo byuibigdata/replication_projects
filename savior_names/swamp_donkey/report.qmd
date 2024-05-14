@@ -11,8 +11,8 @@ from lets_plot import *
 LetsPlot.setup_html()
 # %%
 # Import data
-names = pl.read_parquet("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/BoM_SaviorNames.parquet")
-scriptures = pl.read_csv("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/lds-scriptures.csv")
+names = pl.read_parquet("/savior_names/swamp_donkey/BoM_SaviorNames.parquet")
+scriptures = pl.read_csv("/savior_names/swamp_donkey/lds-scriptures.csv")
 
 bom = scriptures.filter(pl.col("volume_title") == "Book of Mormon")
 
