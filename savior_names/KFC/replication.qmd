@@ -36,7 +36,8 @@ import pyarrow.parquet as pq
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-import pyreadr as r
+import re
+from lets_plot import *
 ```
 
 
@@ -50,22 +51,79 @@ names =  pl.from_arrow(pq.read_table("../BoM_SaviorNames.parquet"))
 
 ```
 
+We were given a data set that contained all the verses in the canonized scriptures of the church of Jesus Christ of Latter-Day Saints. To help show that the Book of Mormon stands among other holy texts, we wanted to show how often the Savior is mentioned in the book. We also had a list of verses with one of the Savior's names mentioned. We had to combine the verses by book in the Book of Mormon and show spacing between those occurrences of His name.
+
 ```{python}
 def dist_names(dat, spl):
-    text = list(dat.select(pl.col("scripture_text").str.to_lowercase().str.concat(" "))["scripture_text"])[0].str.split(sep=spl).unlist()
+    # text = dat.str.concat(" ").str.split(spl).explode()
+    text = re.split(spl,dat)
+    length=[]
+    for i,t in enumerate(text):
+        length.append(len(t.split(" ")))
 
-    len = (list(text.str.split(" "))).length()
-
-    return len
+    return length
 ```
+
 ```{python}
-saviors_names = list(names.select(pl.col("name").unique().sort().str.to_lowercase().str.concat('|'))["name"])[0]
+saviors_names = list(names.select(pl.col("name").unique().sort().str.concat('|'))["name"])[0]
 
 bom = scrips.filter(pl.col("volume_title") == "Book of Mormon")
 
-nested_bom = bom.group_by(pl.col("book_short_title")).all()
+nested_bom = bom.group_by(pl.col("book_short_title", "verse_id")).agg(pl.col("scripture_text")).explode("scripture_text")
 
+# nested_bom["scripture_text"]
 
+# pl.concat([get_words(book) for book in bom_books])
 
+dist_between_bom = nested_bom.with_columns([
+    pl.Series(dist_names(line, saviors_names) for line in nested_bom["scripture_text"]).alias("count")
+    # pl.col("scripture_text").map_batches(lambda x: dist_names(x,saviors_names)).alias("count")
+    # pl.Series(dist_names(nested_bom)).alias("dist_between")
+])
+dist_between_bom = dist_between_bom.explode("count")
 
 ```
+
+
+```{python}
+from lets_plot import *
+LetsPlot.setup_html()
+# first visual - histogram of distance
+# placeholders indicated by --------then column or dataset
+
+ggplot(dist_between_bom, aes("count")) + \
+    geom_histogram() + \
+    xlab("Index") + \
+    ylab("Distance Between Savior's Names") + \
+    ggtitle("Distance Between Savior's Names in Book of Mormon") + \
+    geom_hline(yintercept = dist_between_bom["count"].mean(), size = 1, color = "red") + \
+    geom_label(x = 4000, y = 65, label=dist_between_bom["count"].mean(), fill = "red", color = "white")
+```
+
+A histogram of the distance between all instances of the Savior’s name helps to really grasp the importance and centrality of Jesus Christ. The shape is heavily right skewed with the mode landing as close to zero as possible. This means that having a large number of words between the Savior’s name is very uncommon. The Savior is intertwined within the Book of Mormon  just as He is intertwined with everything on this Earth. It is our goal to make Him as common in our lives as He is seen in this histogram. 
+
+```{python}
+
+# Second visual - boxplot of distances split by book
+
+```
+
+The graph above shows the distribution of the Savior's names between the books in the Book of Mormon. The boxplots are ordered by mean distance. Knowing that the average spacing of the Savior's names across the Book of Mormon was 64.4 words, we can see that the book of Helaman was spaced out more than average, with its mean at 95.9 words. The books of Alma and Helaman have the biggest spikes in distance, as they are heavily affected by outliers. 
+
+
+
+
+
+
+Goals:
+  
+  - Build visuals (at least one) that shows the patterns of word distance between savior names by book in the Book  of Mormon
+  -Can we take stored data where the unit of analysis is verse and convert the unit of analysis to words that appear after a savior name?
+  -Can we build a target variable, the number of words after a savior name?
+  -Can we build the following features;
+    -book where the name appears,
+    -chapter when the name appears,
+    -verse where the name appears,
+    -the number of times that a, an, and, are, as, at, be, but, by, for, if, in, into, is, 
+     it, no, not, of, on, or, such, that, the, their, then, there, these, they, this, to, was, will, with appear in the word block.
+    -The number of verses that the text covers.

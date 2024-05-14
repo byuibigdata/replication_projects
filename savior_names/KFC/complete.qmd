@@ -1,0 +1,147 @@
+---
+title: "Replication Activity"
+subtitle: "Course DS 460"
+author: "Kentucky Fried Champions & Team Nathan"
+execute:
+  warning: false
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show the code"
+    code-overflow: wrap
+    code-copy: hover
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+    
+---
+
+```{python}
+import requests
+from io import BytesIO
+from zipfile import ZipFile
+import re
+import polars as pl
+from lets_plot import *
+import numpy as np
+
+# Load data
+url = "http://scriptures.nephi.org/downloads/lds-scriptures.csv.zip"
+response = requests.get(url)
+zipfile = ZipFile(BytesIO(response.content))
+csv_file = zipfile.open('lds-scriptures.csv')
+scriptures_data = pl.read_csv(csv_file)
+
+# Load Parquet file
+sav_names = pl.read_parquet("../BoM_SaviorNames.parquet")
+
+# Create pattern
+jesuspat = "|".join(sav_names['name'].to_list())
+
+# Filter for Book of Mormon
+bofm = scriptures_data.filter(pl.col('volume_lds_url') == 'bm')
+
+def get_text(book):
+    return " ".join(bofm.filter(pl.col("book_short_title") == book)['scripture_text'].to_list())
+
+def break_sav(phrase, pattern):
+    temp = re.split(pattern, phrase)
+    word_count = [len(re.findall(r'\S+', segment)) for segment in temp]
+    return pl.DataFrame({'text': temp, 'word_count': word_count})
+
+def get_words(book):
+    df = break_sav(get_text(book), jesuspat)
+    df = df.with_columns(pl.lit(book).alias('book'))
+    return df
+
+bom_books = bofm["book_short_title"].unique().to_list()
+words_in_table = pl.concat([get_words(book) for book in bom_books])
+display(words_in_table.head())
+```
+
+#### Description
+We were given a data set that contained all the verses in the canonized scriptures of the church of Jesus Christ of Latter-Day Saints. To help show that the Book of Mormon stands among other holy texts, we wanted to show how often the Savior is mentioned in the book. We also had a list of verses with one of the Savior's names mentioned. We had to combine the verses by book in the Book of Mormon and show spacing between those occurrences of His name. 
+
+## Distance Between Savior's Names Visualizations
+
+
+#### Histogram
+
+```{python}
+LetsPlot.setup_html()
+ggplot(words_in_table, aes("word_count")) + \
+    geom_histogram() + \
+    xlab("Index") + \
+    ylab("Distance Between Savior's Names") + \
+    ggtitle("Distance Between Savior's Names in Book of Mormon") + \
+    geom_hline(yintercept = 64.6, size = 1, color = "red") + \
+    geom_label(x = 4000, y = 65, label='64.6', fill = "red", color = "white")
+```
+
+
+#### Explanation
+A histogram of the distance between all instances of the Savior’s name helps to really grasp the importance and centrality of Jesus Christ. The shape is heavily right skewed with the mode landing as close to zero as possible. This means that having a large number of words between the Savior’s name is very uncommon. The Savior is intertwined within the Book of Mormon  just as He is intertwined with everything on this Earth. It is our goal to make Him as common in our lives as He is seen in this histogram. 
+
+#### BoxPlot
+
+```{python}
+import plotly.express as px
+
+# Assuming 'df' is your DataFrame and 'column_name' is the name of the column you want to group by
+words_in_table.group_by('book').mean().sort('word_count')
+
+# get rid of word_count outliers
+words_in_table = words_in_table.filter(pl.col('word_count') <= 250)
+
+
+fig = px.box(words_in_table,
+             y='word_count',
+             log_y=True,
+             x='book',
+             title="Distance Between Savior's Names by Book in the Book of Mormon",
+             points=False,
+             color='book',
+             color_discrete_sequence=px.colors.qualitative.Pastel,
+             labels={'word_count': 'Word Count', 'book': 'Book Name'})
+
+fig.update_xaxes(categoryorder='array', 
+                 categoryarray=words_in_table.group_by('book')
+                                             .mean()
+                                             .sort('word_count')['book'])
+# make y axis normal
+fig.update_yaxes(type='linear')
+
+fig.update_layout(
+    yaxis_title="Word Count",
+    xaxis_title="Book name",
+    template="plotly_white",
+    showlegend=False
+)
+
+# Show the figure
+fig.show()
+```
+
+
+#### Explanation
+The graph above shows the distribution of the Savior's names between the books in the Book of Mormon. The boxplots are ordered by mean distance. Knowing that the average spacing of the Savior's names across the Book of Mormon was 64.6 words, we can see that the book of Helaman was spaced out more than average, with its mean at 96.26 words. The books of Alma and Helaman have the biggest spikes in distance, as they are heavily affected by outliers. Moroni and Mormon have the least spread in their interquatile range because they are the most consistent with testifying of the Savior while the other books have more history involved in their text.
+
+
+```{python}
+means = words_in_table.group_by('book').agg(pl.mean("word_count"))
+means = (means.with_columns([
+    pl.col("word_count").round(2).alias("mean")
+]))
+means = means.sort("word_count")
+with pl.Config(tbl_rows=15):
+    display(means[["book", "mean"]])
+```
