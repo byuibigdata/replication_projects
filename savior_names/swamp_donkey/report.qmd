@@ -1,3 +1,29 @@
+---
+title: "Savior's names"
+subtitle: "Replication Project"
+execute:
+  warning: false
+format:
+  html:
+    self-contained: true
+    page-layout: full
+    title-block-banner: true
+    toc: true
+    toc-depth: 3
+    toc-location: body
+    number-sections: false
+    html-math-method: katex
+    code-fold: true
+    code-summary: "Show code"
+    code-overflow: wrap
+    code-tools:
+        source: false
+        toggle: true
+        caption: See code
+
+---
+
+
 # Savior's Names in The Book of Mormon 
 
 
@@ -11,8 +37,8 @@ from lets_plot import *
 LetsPlot.setup_html()
 # %%
 # Import data
-names = pl.read_parquet("/savior_names/swamp_donkey/BoM_SaviorNames.parquet")
-scriptures = pl.read_csv("/savior_names/swamp_donkey/lds-scriptures.csv")
+names = pl.read_parquet("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/BoM_SaviorNames.parquet")
+scriptures = pl.read_csv("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/lds-scriptures.csv")
 
 bom = scriptures.filter(pl.col("volume_title") == "Book of Mormon")
 
