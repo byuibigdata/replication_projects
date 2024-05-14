@@ -1,0 +1,80 @@
+# Savior's Names in The Book of Mormon 
+
+
+```{python}
+# %%
+# Load Libraries 
+import plotly.express as px
+import polars as pl 
+from lets_plot import *
+
+LetsPlot.setup_html()
+# %%
+# Import data
+names = pl.read_parquet("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/BoM_SaviorNames.parquet")
+scriptures = pl.read_csv("/Users/brooklynn/Documents/GitHub/replication_projects/savior_names/swamp_donkey/lds-scriptures.csv")
+
+bom = scriptures.filter(pl.col("volume_title") == "Book of Mormon")
+
+```
+
+
+```{python}
+
+bom_text = bom\
+    .group_by("book_title")\
+    .agg(pl.col("scripture_text").str.concat(delimiter=" "))
+
+
+name_r = names.select(
+    pl.col("name").str.concat(delimiter="|")
+).item()
+
+
+# %%
+split_on_names = bom_text.with_columns(
+    pl.col("scripture_text").str.replace_all(pattern=name_r, value="$").alias("each_name")
+).with_columns(
+    pl.col("each_name").str.split(by="$")
+).explode("each_name")
+
+
+# %%
+dist_by_book = (
+    split_on_names
+    .select(
+    [
+        'book_title',
+        pl.col("each_name").str.count_matches(pattern = " ").alias("word_count")
+    ])
+)
+
+book_order = ("1 Nephi", "2 Nephi",  "Jacob", 
+    "Enos", "Jarom", "Omni", "Words of Mormon", 
+    "Mosiah", "Alma", "Helaman",  "3 Nephi", "4 Nephi",
+    "Mormon", "Ether", "Moroni")
+
+ordered_by_book = dist_by_book.with_row_count('i').join(
+        pl.from_dicts([{'order':x, 'book_title':y} for x,y in enumerate(book_order)]), on='book_title') \
+    .sort('order')
+
+```
+
+
+
+
+```{python}
+ggplot(ordered_by_book, aes(x="word_count", y="book_title")) +\
+    geom_boxplot(color="darkblue", fill="darkblue", alpha=.2, outlier_alpha=0.5) +\
+    coord_cartesian(xlim=(0, 250)) +\
+    labs(y="Book", x="Words Between the Saviors Names", title="Christ's Names Throughout The Book of Mormon")
+
+```
+
+From the graph above we can see that the savior is all over the Book of Mormon. His name appears on average every 64 words. We can see from the visual above however, that the outliers pull this average up. What you can't see on the graph is there is one instance in Alma where it takes over 1000 words for the savior to be mentioned. This is durring the war chapters. 
+
+From this visual we can see that Jarom has a very high average for distances between references to Christ. Jarom also has the lowest number of words compared to the other Book of Mormon books with only 731 words total. So his highest seperation influences his average distance more than the other books would. On the oposite end we can see Mormon mentions his Savior pleanty.
+
+Another cool take away is that the majority of the books have a zero to two word gap as their low. This shows that when they are talking about Jesus, they are talking a lot about him which is cool.
+
+
