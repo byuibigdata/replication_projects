@@ -1,0 +1,90 @@
+
+---
+title: "Savior Names Replication Project"
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+```{python}
+# Load in packages and data
+import polars as pl
+import numpy as np
+from lets_plot import *
+LetsPlot.setup_html()
+df = pl.read_csv('lds-scriptures.csv')
+names = pl.read_parquet('..\savior_names\BoM_SaviorNames.parquet')
+df = df.filter(pl.col('volume_title') == 'Book of Mormon')
+df.head()
+
+```
+
+
+```{python}
+savior_name = names['name'].to_list()
+
+test = df
+for name in savior_name:
+  test = test.with_columns(
+    pl.col('scripture_text').str.replace_all(name,'_Savior|'))
+
+test = test.with_columns(
+  pl.col('scripture_text').alias('savior_names')
+)
+
+test = test.with_columns(
+  pl.col('scripture_text').str.split(by='|')
+)
+
+words = test['scripture_text'].to_list()
+
+#words = ' '.join(words)
+
+#print(words)
+test = test.explode('scripture_text')
+
+```
+
+```{python}
+
+test = test.group_by('book_title','book_id').agg(
+  pl.col('scripture_text').str.concat(" ")
+)
+
+test = test.with_columns(
+    pl.col('scripture_text').str.count_matches(r"\b[\w-]+\b").alias("word_count")
+)
+
+test = test.with_columns(
+  pl.col('scripture_text').str.count_matches('_Savior').alias('savior_names')
+)
+test['word_count'].sum() / test['savior_names'].sum()
+
+test = test.with_columns(
+  (pl.col('word_count') / pl.col('savior_names')).alias('words_between')
+)
+
+test = test.sort('book_id')
+
+#test = test.with_columns(
+#  pl.when(pl.col('savior_names').str.contains('_Savior')).then(1).#otherwise(0).alias('savior')
+#  )
+
+```
+
+## Where do we see the Savior's name the most?
+
+When looking at the chart below, it's clear to see that the Savior's name shows up most frequently at the end of the Book of Mormon. The Savior's name also shows up a lot towards the beginning, during the Words of Mormon, and when Christ visits the Americas. We don't see the Savior's name mentioned near as much in jarom, Alma, or Helaman.
+
+This is fascinating to see, but also makes a lot of sense. There's a lot of war going on In Alma and Helaman, and these chapters are much longer. This gives less time for mentions of the Savior. Then, in Moroni, it makes sense that to finish off the Book of Mormon, the focus would be on the Savior.
+
+```{python}
+ggplot(test,aes(x='book_title',y='words_between'))+\
+  geom_line()+\
+    xlab('Book')+\
+      ylab('Words Between Savior\'s Name')+\
+        ggtitle('Word Distance Between Savior Names')
+
+```
+
