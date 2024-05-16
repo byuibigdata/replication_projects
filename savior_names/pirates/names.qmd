@@ -18,6 +18,178 @@ execute:
   warning: false
 ---
 
+
 ```{python}
-print('testing')
+#| code-summary: Workspace setup
+import polars as pl
+from lets_plot import *
+
+LetsPlot.setup_html()
+names_df = pl.read_parquet('..\BoM_SaviorNames.parquet')
+script_df = pl.read_csv('lds-scriptures.csv').filter(pl.col('volume_title') == 'Book of Mormon').select(['verse_id', 'book_id', 'book_title', 'chapter_number', 'verse_number', 'scripture_text'])
+```
+
+## Initial Scriptures Table
+  This is the original table of the scriptures, with each row corresponding to a verse in the Book of Mormon
+
+```{python}
+#| code-summary: Examining and wrangling data
+savior_names = names_df['name'].to_list()
+
+verse_list = script_df['scripture_text'].to_list()
+words = " ".join(verse_list)
+
+script_df = script_df.with_columns(pl.Series('occuring_names', [0], dtype=pl.Int64))
+
+entry_count = 0
+for entry in script_df.rows():
+  for name in savior_names:
+    if name in entry[5]:
+      script_df[entry_count, 'occuring_names'] += 1
+
+  entry_count += 1
+
+script_df
+```
+
+## Savior Names in the Book of Mormon
+  In the following bar chart, we see a brief rundown of the number of times a name for the savior appears in each book in the Book of Mormon. We can see that Alma has far more occurences than any other book. However, this chart is skewed because it does not account of the length of each book; Alma being far longer than any other book, it is not surprising that is also has the most occurences. Instead, a more fascinating statistic below could be how often a name for the savior appears. 
+
+```{python}
+#| code-summary: Names per book chart
+names_per_book = script_df.group_by('book_title').agg(pl.sum('occuring_names').alias('sum')).sort('sum', descending=True)
+
+ggplot() + \
+  geom_bar(aes(x='book_title', y='sum', fill='book_title'), data=names_per_book, \
+             stat='identity', show_legend=False) + \
+              xlab('Book') + \
+                ylab('Total Savior Names')
+```
+
+
+```{python}
+#| code-summary: Words between names
+words_df = script_df
+
+for name in savior_names:
+  words_df = words_df.with_columns(
+    pl.col('scripture_text').str.replace_all(name,'_Savior|'))
+
+words_df = words_df.with_columns(
+  pl.col('scripture_text').alias('savior_names')
+)
+
+words_df = words_df.with_columns(
+  pl.col('savior_names').str.split(by='|')
+)
+
+# words = words_df['scripture_text'].to_list()
+
+#words = ' '.join(words)
+
+#print(words)
+words_df = words_df.explode('savior_names')
+
+# words_df = words_df.with_columns(pl.col('savior_names').str.split(' ').alias('word_block'))
+
+entry_count = 0
+while entry_count < len(words_df)-1:
+  if words_df[entry_count]['savior_names'][0][-7:] != '_Savior':
+    words_df[entry_count, 'savior_names'] += f' {words_df[entry_count+1, 'savior_names']}'
+    words_df = words_df[:entry_count+1].vstack(words_df[entry_count+2:])
+  else:
+    entry_count += 1
+```
+
+```{python}
+#| code-summary: Making target columns
+words_df = words_df.with_columns(pl.col('savior_names').str.split(' ').list.lengths().alias('words_between'))
+
+words_df = words_df.with_columns(pl.Series('spanning_verses', [0], dtype=pl.Int64))
+entry_count = 0
+for entry in words_df.rows():
+  try:
+    words_df[entry_count, 'spanning_verses'] = words_df[entry_count+1, 'verse_id'] + 1 - words_df[entry_count, 'verse_id']
+  except:
+    pass
+
+  entry_count += 1
+```
+
+```{python}
+#| code-summary: Numbe of 'small-words'
+
+small = ['a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for', 'if', 'in', 'into', 'is', 'it', 'no', 'not', 'of', 'on', 'or', 'such', 'that', 'the', 'their', 'then', 'there', 'these', 'they', 'this', 'to', 'was', 'will', "with"]
+
+small_df = words_df
+
+small_df = small_df.with_columns(pl.Series('occuring_small_words', [0], dtype=pl.Int64))
+
+entry_count = 0
+for entry in small_df.rows():
+  for word in small:
+    if word in entry[7].lower():
+      small_df[entry_count, 'occuring_small_words'] += 1
+
+  entry_count += 1
+```
+
+## Verification
+  Verifies that the table matches expected results. Average distance between words should be ~65
+```{python}
+#| code-summary: Verification test
+small_df['words_between'].mean()
+```
+
+```{python} 
+#| code-summary: Optional Book Grouping
+# final_df = small_df
+# final_df = final_df.group_by('book_title', 'book_id').agg(
+#   [pl.col('scripture_text').str.concat(" "),
+#   pl.sum('occuring_small_words').alias('small_words')]
+# )
+
+# final_df = final_df.with_columns(
+#     pl.col('scripture_text').str.count_matches(r"\b[\w-]+\b").alias("word_count")
+# )
+
+# final_df = final_df.with_columns(
+#   pl.col('scripture_text').str.count_matches('_Savior').alias('savior_names')
+# )
+# final_df['word_count'].sum() / final_df['savior_names'].sum()
+
+# final_df = final_df.with_columns(
+#   (pl.col('word_count') / pl.col('savior_names')).alias('words_between'),
+#   (pl.col('small_words') / pl.col('savior_names')).alias('small_words_between')
+# )
+
+# final_df = final_df.sort('book_id')
+
+# # final_df = final_df.with_columns(
+# #  pl.when(pl.col('savior_names').str.contains('_Savior')).then(1).#otherwise(0).alias('savior')
+# #  )
+
+# final_df.head(5)
+```
+
+## Distance Between Savior Names
+  The data below gives a clearer and more interesting perspective. Each row in the given table corresponds to an instance of a savior name. The table tells you which book, chapter, and verse the name was found, how many 'small words' (such as 'in', 'the', 'as', etc.) occur in that word block. In addition to this, it shows us how many verses the block includes, and finally, the number of words since the last instance of a Savior name. 
+
+  The accompanying box plot shows the distribution of words between each Savior name per book. We see Jarom has the highest median number of words between names. Helaman however has the highest variety of distances followed closely by Alma. The highest concentration of Savior names occurs in the last 4 books of the Book of Mormon. This is unsurprising, as it is when the Savior visits the Americas, and the conclusion of the book. 
+
+```{python}
+#| code-summary: Final Visualizations
+final_df = small_df.select(['book_title', 'chapter_number', 'verse_number', 'occuring_small_words', 'spanning_verses', 'words_between'])
+display(final_df.head(5))
+
+ggplot(final_df, aes(x='book_title', y='words_between')) + \
+    geom_jitter(alpha = .3) + \
+    geom_boxplot(outlier_alpha = 0, color = 'black', alpha = .7) + \
+    ggtitle("Distance Between Savior Names") + \
+    scale_y_continuous(limits = [0,200]) + \
+    xlab("Book") + \
+    ylab("Words Between Savior Names") + \
+    labs(fill = 'Book Title') + \
+    theme(title = element_text(hjust = .5)) + \
+    theme(title = element_text(face = 'bold'))
 ```
